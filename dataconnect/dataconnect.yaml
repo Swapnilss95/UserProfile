@@ -1,0 +1,13 @@
+specVersion: "v1"
+serviceId: "userprofile-7b170-service"
+location: "us-east4"
+schemas:
+  - source: "./schema"
+    datasource:
+      postgresql:
+        database: "userprofile-7b170-database"
+        cloudSql:
+          instanceId: "userprofile-7b170-instance"
+          # schemaValidation: "STRICT"     # STRICT mode makes Postgres schema match Data Connect exactly.
+          # schemaValidation: "COMPATIBLE" # COMPATIBLE mode makes Postgres schema compatible with Data Connect.
+connectorDirs: ["./example"]

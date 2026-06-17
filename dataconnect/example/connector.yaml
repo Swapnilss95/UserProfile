@@ -1,0 +1,6 @@
+connectorId: example
+generate:
+  dartSdk:
+    - outputDir: ..\..\user_login_profile\lib\dataconnect_generated
+      package: dataconnect_generated/generated.dart
+      clientCache: {}
