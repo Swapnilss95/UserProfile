@@ -14,7 +14,7 @@ const Color _textMuted = Color(0xFF4A5A72);
 // ─────────────────────────────────────────────────────────────────────────────
 
 class RequestServiceScreen extends StatefulWidget {
-  const RequestServiceScreen({super.key});
+  const RequestServiceScreen({super.key, required String jobDocId});
 
   @override
   State<RequestServiceScreen> createState() => _RequestServiceScreenState();

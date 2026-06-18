@@ -1,20 +1,15 @@
-import 'dart:math';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:user_login_profile/userprofil.dart';
 
 class PaymentScreen extends StatefulWidget {
-  final bool? isSuccess; 
-  final String transactionRef;
-  final String amount;
-  final String? errorMessage;
+  final String jobDocId;
 
   const PaymentScreen({
     super.key,
-    this.isSuccess,
-    required this.transactionRef,
-    required this.amount,
-    this.errorMessage,
+    this.jobDocId = '', required bool isSuccess, required String transactionRef, required String amount,
   });
 
   @override
@@ -23,119 +18,126 @@ class PaymentScreen extends StatefulWidget {
 
 class _ThemeColors {
   static const Color primaryPurple = Color(0xFF6366F1);
-  static const Color successGreen = Color(0xFF10B981);
-  static const Color alertRed = Color(0xFFEF4444);
+  static const Color successGreen  = Color(0xFF10B981);
+  static const Color alertRed      = Color(0xFFEF4444);
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _isLoading = true;
-  late bool _finalSuccessState;
-  late String _finalRequestId;
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String _clientName    = "Loading...";
+  String _clientMobile  = "Loading...";
+  String _address       = "Loading...";
+  String _serviceType   = "Loading...";
+  String _status        = "request";
+  String _totalAmount   = "Loading...";
+  String _txnRef        = "Loading...";
+  List   _items         = [];
 
-  // Dynamic User Booking Details from Firestore
-  String _userName = "Loading...";
-  String _userMobile = "Loading...";
-  String _serviceAddress = "Loading...";
-  String _scheduledDate = "Loading...";
-  String _scheduledTime = "Loading...";
+  String _washmitraName   = "";
+  String _washmitramobile = "";
+  bool   _isAssigned      = false;
 
-  // Dynamic Partner values from Firestore
-  String _providerName = "Loading...";
-  String _providerMobile = "Loading...";
-  String _storeName = "Loading...";
-  String _storeAddress = "Loading...";
+  // ✅ FIX: nullable so dispose() doesn't crash if never assigned
+  StreamSubscription<DocumentSnapshot>? _jobSub;
 
   @override
   void initState() {
     super.initState();
-    _simulateRequestCheck();
+    _listenToJob();
   }
 
-  void _simulateRequestCheck() async {
-    _finalRequestId = widget.transactionRef.isEmpty || widget.transactionRef == 'N/A'
-        ? 'REQ-${Random().nextInt(8999) + 1000}'
-        : widget.transactionRef;
+  void _listenToJob() {
+    if (widget.jobDocId.isEmpty) {
+      _loadLatestJob();
+      return;
+    }
+    _jobSub = FirebaseFirestore.instance
+        .collection('Jobs')
+        .doc(widget.jobDocId)
+        .snapshots()
+        .listen((doc) {
+      if (!doc.exists || !mounted) return;
+      _parseJobData(doc.data() as Map<String, dynamic>);
+    });
+  }
 
+  Future<void> _loadLatestJob() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
     try {
-      DocumentSnapshot requestDoc = await _firestore
-          .collection('requests') 
-          .doc(_finalRequestId)
+      final snap = await FirebaseFirestore.instance
+          .collection('Jobs')
+          .where('userId', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
           .get();
 
-      if (requestDoc.exists && mounted) {
-        _parseAndSetRequestData(requestDoc.data() as Map<String, dynamic>);
+      if (snap.docs.isNotEmpty && mounted) {
+        _jobSub = FirebaseFirestore.instance
+            .collection('Jobs')
+            .doc(snap.docs.first.id)
+            .snapshots()
+            .listen((doc) {
+          if (!doc.exists || !mounted) return;
+          _parseJobData(doc.data() as Map<String, dynamic>);
+        });
       } else {
-        QuerySnapshot fallbackQuery = await _firestore
-            .collection('requests')
-            .orderBy('createdAt', descending: true)
-            .limit(1)
-            .get();
-
-        if (fallbackQuery.docs.isNotEmpty && mounted) {
-          var latestDoc = fallbackQuery.docs.first;
-          _finalRequestId = latestDoc.id; 
-          _parseAndSetRequestData(latestDoc.data() as Map<String, dynamic>);
-        } else {
-          setState(() {
-            _finalSuccessState = widget.isSuccess ?? false;
-            _userName = "Unknown User";
-            _userMobile = "N/A";
-            _serviceAddress = "No matching profile found in database";
-            _scheduledDate = "N/A";
-            _scheduledTime = "N/A";
-          });
-        }
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint("Error fetching parameters from Firestore: $e");
-      setState(() {
-        _finalSuccessState = widget.isSuccess ?? false;
-        _userName = "Error Loading";
-        _userMobile = "Error Loading";
-        _serviceAddress = e.toString();
-      });
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _parseAndSetRequestData(Map<String, dynamic> requestData) async {
-    String currentStatus = requestData['status'] ?? '';
-    bool isApproved = currentStatus.toLowerCase() == 'approved' || currentStatus.toLowerCase() == 'accepted';
-
-    setState(() {
-      _finalSuccessState = widget.isSuccess ?? isApproved;
-      _userName = requestData['userName'] ?? 'Not Disclosed';
-      _userMobile = requestData['userPhone'] ?? 'Not Disclosed';
-      _serviceAddress = requestData['serviceAddress'] ?? 'Not Provided';
-      _scheduledDate = requestData['scheduledDate'] ?? 'Not Scheduled';
-      _scheduledTime = requestData['scheduledTime'] ?? 'Not Scheduled';
-    });
-
-    if (_finalSuccessState && requestData.containsKey('partnerId')) {
-      String partnerId = requestData['partnerId'];
-
-      DocumentSnapshot partnerDoc = await _firestore
-          .collection('partners') 
-          .doc(partnerId)
-          .get();
-
-      if (partnerDoc.exists && mounted) {
-        final partnerData = partnerDoc.data() as Map<String, dynamic>;
+      if (mounted) {
         setState(() {
-          _providerName = partnerData['name'] ?? 'Not Disclosed';
-          _providerMobile = partnerData['mobile'] ?? partnerData['phone'] ?? 'Not Disclosed';
-          _storeName = partnerData['storeName'] ?? 'Wahmitra Partner Hub';
-          _storeAddress = partnerData['storeAddress'] ?? partnerData['address'] ?? 'Not Provided';
+          _isLoading = false;
+          _status = "Error: $e";
         });
       }
     }
+  }
+
+  void _parseJobData(Map<String, dynamic> data) async {
+    final wId = data['washmitraId'];
+    // ✅ FIX: only treat as assigned if non-null AND non-empty string
+    final bool assigned = wId != null && wId.toString().trim().isNotEmpty;
+
+    if (!mounted) return;
+    setState(() {
+      _clientName   = data['clientName']     ?? 'N/A';
+      _clientMobile = data['mobile']         ?? 'N/A';
+      _address      = data['address']        ?? 'N/A';
+      _serviceType  = data['serviceType']    ?? 'N/A';
+      _status       = data['status']         ?? 'request';
+      _totalAmount  = data['totalAmount']?.toString() ?? 'N/A';
+      _txnRef       = data['transactionRef'] ?? 'N/A';
+      _items        = List.from(data['items'] ?? []);
+      _isAssigned   = assigned;
+      _isLoading    = false;
+    });
+
+    if (assigned) {
+      try {
+        final wDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(wId.toString())
+            .get();
+        if (wDoc.exists && mounted) {
+          final wd = wDoc.data() as Map<String, dynamic>;
+          setState(() {
+            _washmitraName   = wd['name']   ?? 'N/A';
+            _washmitramobile = wd['mobile'] ?? 'N/A';
+          });
+        }
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void dispose() {
+    _jobSub?.cancel(); // ✅ FIX: safe cancel with ?
+    super.dispose();
   }
 
   @override
@@ -152,247 +154,258 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         ),
         child: SafeArea(
-          child: _isLoading 
-              ? _buildLoadingState() 
+          child: _isLoading
+              ? _buildLoading()
               : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-                  child: _buildStatusState(context),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 20),
+                  child: _buildContent(context),
                 ),
         ),
       ),
     );
   }
 
-  Widget _buildLoadingState() {
-    return Center(
+  Widget _buildLoading() {
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(
-            height: 55,
-            width: 55,
+          SizedBox(
+            width: 55, height: 55,
             child: CircularProgressIndicator(
               strokeWidth: 4.5,
-              valueColor: AlwaysStoppedAnimation<Color>(_ThemeColors.primaryPurple),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                  _ThemeColors.primaryPurple),
             ),
           ),
-          const SizedBox(height: 28),
-          const Text(
-            "Syncing Request Status...",
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Checking authorization pipelines on Wahmitra servers...",
-            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-          ),
+          SizedBox(height: 24),
+          Text("Loading order status...",
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white)),
         ],
       ),
     );
   }
 
-  Widget _buildStatusState(BuildContext context) {
-    final statusColor = _finalSuccessState ? _ThemeColors.successGreen : _ThemeColors.alertRed;
+  Widget _buildContent(BuildContext context) {
+    final bool isAccepted =
+        _status == 'pending' || _status == 'completed';
+    final Color statusColor =
+        isAccepted ? _ThemeColors.successGreen : _ThemeColors.alertRed;
 
     return Column(
       children: [
         const SizedBox(height: 20),
-        // Decorative Status Icon
+
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: statusColor.withOpacity(0.15),
             shape: BoxShape.circle,
-            border: Border.all(color: statusColor.withOpacity(0.3), width: 2),
+            border:
+                Border.all(color: statusColor.withOpacity(0.3), width: 2),
           ),
           child: Icon(
-            _finalSuccessState ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
+            isAccepted
+                ? Icons.check_circle_outline_rounded
+                : Icons.hourglass_empty_rounded,
             color: statusColor,
             size: 72,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
+
         Text(
-          _finalSuccessState ? "Request Approved!" : "Request Order Status",
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5),
+          isAccepted ? "Request Accepted!" : "Request Submitted",
+          style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Text(
-          _finalSuccessState 
-              ? "Wahmitra has verified and successfully completed your service pipeline request setup."
-              : (widget.errorMessage ?? "Your request layout parameters are actively logged in our registry database."),
+          isAccepted
+              ? "A washmitra has accepted your request."
+              : "Waiting for a washmitra to accept your request.",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.7), height: 1.5),
+          style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.7),
+              height: 1.5),
         ),
-        const SizedBox(height: 32),
-        
-        // Track ID Row Glass Card
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-          decoration: BoxDecoration(
-            color: Colors.black26,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
-          ),
+        const SizedBox(height: 24),
+
+        _glassCard(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Track ID", style: TextStyle(fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.5), fontSize: 14)),
-              Text(
-                _finalRequestId, 
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              Text("Track ID",
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 13)),
+              Flexible(
+                child: Text(_txnRef,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // SECTION 1: Your Real-time Firestore Booking Details Card
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              )
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.assignment_outlined, color: _ThemeColors.primaryPurple, size: 22),
-                  const SizedBox(width: 10),
-                  Text(
-                    "Your Booking Information",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white.withOpacity(0.95)),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Divider(color: Colors.white.withOpacity(0.1), height: 1),
-              ),
-              _buildInfoRow(Icons.person_outline, "Name", _userName),
-              const SizedBox(height: 14),
-              _buildInfoRow(Icons.phone_android, "Mobile", _userMobile),
-              const SizedBox(height: 14),
-              _buildInfoRow(Icons.location_on_outlined, "Address", _serviceAddress),
-              const SizedBox(height: 14),
-              _buildInfoRow(Icons.calendar_today_outlined, "Date Scheduled", _scheduledDate),
-              const SizedBox(height: 14),
-              _buildInfoRow(Icons.access_time, "Time Window", _scheduledTime),
-            ],
-          ),
+        _sectionCard(
+          icon: Icons.assignment_outlined,
+          title: "Your Order",
+          color: _ThemeColors.primaryPurple,
+          rows: [
+            _row(Icons.person_outline, "Name", _clientName),
+            _row(Icons.phone_android, "Mobile", _clientMobile),
+            _row(Icons.location_on_outlined, "Address", _address),
+            _row(Icons.local_laundry_service_outlined,
+                "Service", _serviceType),
+            _row(Icons.currency_rupee, "Total", "₹$_totalAmount"),
+            _row(Icons.info_outline, "Status",
+                _status.toUpperCase()),
+          ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // SECTION 2: Partner Details Section (Shows only on Active Approvals)
-        if (_finalSuccessState) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: _ThemeColors.successGreen.withOpacity(0.25), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                )
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.storefront, color: _ThemeColors.successGreen, size: 22),
-                    const SizedBox(width: 10),
-                    Text(
-                      "Assigned Partner Details",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white.withOpacity(0.95)),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: Divider(color: Colors.white.withOpacity(0.1), height: 1),
-                ),
-                _buildInfoRow(Icons.person_outline, "Name", _providerName),
-                const SizedBox(height: 14),
-                _buildInfoRow(Icons.phone_android, "Mobile", _providerMobile),
-                const SizedBox(height: 14),
-                _buildInfoRow(Icons.business, "Store Name", _storeName),
-                const SizedBox(height: 14),
-                _buildInfoRow(Icons.location_on_outlined, "Address", _storeAddress),
-              ],
-            ),
+        if (_items.isNotEmpty)
+          _sectionCard(
+            icon: Icons.list_alt_outlined,
+            title: "Items Ordered",
+            color: _ThemeColors.primaryPurple,
+            rows: _items.map<Widget>((item) {
+              return _row(
+                Icons.check_circle_outline,
+                item['title']?.toString() ?? 'Item',
+                item['cost']?.toString() ?? '',
+              );
+            }).toList(),
           ),
-          const SizedBox(height: 35),
-        ] else ...[
-          const SizedBox(height: 35),
-        ],
-        
-        // Navigation Button
+        const SizedBox(height: 16),
+
+        if (_isAssigned)
+          _sectionCard(
+            icon: Icons.storefront,
+            title: "Your Washmitra",
+            color: _ThemeColors.successGreen,
+            rows: [
+              _row(Icons.person_outline, "Name", _washmitraName),
+              _row(Icons.phone_android, "Mobile",
+                  _washmitramobile),
+            ],
+          ),
+
+        const SizedBox(height: 32),
+
         SizedBox(
           width: double.infinity,
-          height: 56,
+          height: 54,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _finalSuccessState ? _ThemeColors.primaryPurple : Colors.transparent,
+              backgroundColor: _ThemeColors.primaryPurple,
               foregroundColor: Colors.white,
               elevation: 0,
-              side: _finalSuccessState ? BorderSide.none : BorderSide(color: Colors.white.withOpacity(0.3), width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
             ),
-            onPressed: () {
-              if (_finalSuccessState) {
-                UserProfileScreen.switchToServicesTab(context);
-              } else {
-                Navigator.pop(context);
-              }
-            },
-            child: Text(
-              _finalSuccessState ? "Return to Store" : "Modify Request",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-            ),
+            onPressed: () =>
+                UserProfileScreen.switchToServicesTab(context),
+            child: const Text("Back to Services",
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: Colors.white.withOpacity(0.4)),
-        const SizedBox(width: 12),
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13, fontWeight: FontWeight.w500),
+  Widget _glassCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _sectionCard({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required List<Widget> rows,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border:
+            Border.all(color: color.withOpacity(0.2), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 10),
+            Text(title,
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white.withOpacity(0.95))),
+          ]),
+          Divider(
+              height: 24,
+              color: Colors.white.withOpacity(0.08)),
+          ...rows,
+        ],
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon,
+              size: 16, color: Colors.white.withOpacity(0.4)),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 90,
+            child: Text(label,
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.45),
+                    fontSize: 13)),
           ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, height: 1.3),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3)),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
