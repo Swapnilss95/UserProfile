@@ -4,41 +4,38 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:user_login_profile/userprofil.dart';
 
-class PaymentScreen extends StatefulWidget {
-  final String jobDocId;
+// ─── Theme ────────────────────────────────────────────────────────────────────
+class _C {
+  static const purple = Color(0xFF6366F1);
+  static const green  = Color(0xFF10B981);
+  static const red    = Color(0xFFEF4444);
+}
 
-  const PaymentScreen({
-    super.key,
-    this.jobDocId = '', required bool isSuccess, required String transactionRef, required String amount,
-  });
+class PaymentScreen extends StatefulWidget {
+  // ✅ Clean constructor — only jobDocId needed
+  final String jobDocId;
+  const PaymentScreen({super.key, this.jobDocId = ''});
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _ThemeColors {
-  static const Color primaryPurple = Color(0xFF6366F1);
-  static const Color successGreen  = Color(0xFF10B981);
-  static const Color alertRed      = Color(0xFFEF4444);
-}
-
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _isLoading = true;
 
-  String _clientName    = "Loading...";
-  String _clientMobile  = "Loading...";
-  String _address       = "Loading...";
-  String _serviceType   = "Loading...";
-  String _status        = "request";
-  String _totalAmount   = "Loading...";
-  String _txnRef        = "Loading...";
-  List   _items         = [];
+  String _clientName   = 'Loading...';
+  String _clientMobile = 'Loading...';
+  String _address      = 'Loading...';
+  String _serviceType  = 'Loading...';
+  String _status       = 'request';
+  String _totalAmount  = 'Loading...';
+  String _txnRef       = 'Loading...';
+  List   _items        = [];
 
-  String _washmitraName   = "";
-  String _washmitramobile = "";
+  String _washmitraName   = '';
+  String _washmitramobile = '';
   bool   _isAssigned      = false;
 
-  // ✅ FIX: nullable so dispose() doesn't crash if never assigned
   StreamSubscription<DocumentSnapshot>? _jobSub;
 
   @override
@@ -89,19 +86,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
         if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _status = "Error: $e";
-        });
-      }
+      if (mounted) setState(() { _isLoading = false; _status = 'Error: $e'; });
     }
   }
 
-  void _parseJobData(Map<String, dynamic> data) async {
+  Future<void> _parseJobData(Map<String, dynamic> data) async {
     final wId = data['washmitraId'];
-    // ✅ FIX: only treat as assigned if non-null AND non-empty string
-    final bool assigned = wId != null && wId.toString().trim().isNotEmpty;
+    final bool assigned =
+        wId != null && wId.toString().trim().isNotEmpty;
 
     if (!mounted) return;
     setState(() {
@@ -136,7 +128,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
-    _jobSub?.cancel(); // ✅ FIX: safe cancel with ?
+    _jobSub?.cancel();
     super.dispose();
   }
 
@@ -166,60 +158,52 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 55, height: 55,
-            child: CircularProgressIndicator(
-              strokeWidth: 4.5,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                  _ThemeColors.primaryPurple),
+  Widget _buildLoading() => const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 55, height: 55,
+              child: CircularProgressIndicator(
+                  strokeWidth: 4.5,
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(_C.purple)),
             ),
-          ),
-          SizedBox(height: 24),
-          Text("Loading order status...",
-              style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white)),
-        ],
-      ),
-    );
-  }
+            SizedBox(height: 24),
+            Text('Loading order status...',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
+          ],
+        ),
+      );
 
   Widget _buildContent(BuildContext context) {
-    final bool isAccepted =
+    final bool accepted =
         _status == 'pending' || _status == 'completed';
-    final Color statusColor =
-        isAccepted ? _ThemeColors.successGreen : _ThemeColors.alertRed;
+    final Color sc = accepted ? _C.green : _C.red;
 
     return Column(
       children: [
         const SizedBox(height: 20),
-
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.15),
+            color: sc.withOpacity(0.15),
             shape: BoxShape.circle,
-            border:
-                Border.all(color: statusColor.withOpacity(0.3), width: 2),
+            border: Border.all(color: sc.withOpacity(0.3), width: 2),
           ),
           child: Icon(
-            isAccepted
+            accepted
                 ? Icons.check_circle_outline_rounded
                 : Icons.hourglass_empty_rounded,
-            color: statusColor,
-            size: 72,
+            color: sc, size: 72,
           ),
         ),
         const SizedBox(height: 20),
-
         Text(
-          isAccepted ? "Request Accepted!" : "Request Submitted",
+          accepted ? 'Request Accepted!' : 'Request Submitted',
           style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -227,9 +211,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          isAccepted
-              ? "A washmitra has accepted your request."
-              : "Waiting for a washmitra to accept your request.",
+          accepted
+              ? 'A washmitra has accepted your request.'
+              : 'Waiting for a washmitra to accept your request.',
           textAlign: TextAlign.center,
           style: TextStyle(
               fontSize: 14,
@@ -242,7 +226,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Track ID",
+              Text('Track ID',
                   style: TextStyle(
                       color: Colors.white.withOpacity(0.5),
                       fontSize: 13)),
@@ -260,28 +244,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ),
         const SizedBox(height: 16),
 
-        _sectionCard(
+        _section(
           icon: Icons.assignment_outlined,
-          title: "Your Order",
-          color: _ThemeColors.primaryPurple,
+          title: 'Your Order',
+          color: _C.purple,
           rows: [
-            _row(Icons.person_outline, "Name", _clientName),
-            _row(Icons.phone_android, "Mobile", _clientMobile),
-            _row(Icons.location_on_outlined, "Address", _address),
+            _row(Icons.person_outline, 'Name', _clientName),
+            _row(Icons.phone_android, 'Mobile', _clientMobile),
+            _row(Icons.location_on_outlined, 'Address', _address),
             _row(Icons.local_laundry_service_outlined,
-                "Service", _serviceType),
-            _row(Icons.currency_rupee, "Total", "₹$_totalAmount"),
-            _row(Icons.info_outline, "Status",
+                'Service', _serviceType),
+            _row(Icons.currency_rupee, 'Total', '₹$_totalAmount'),
+            _row(Icons.info_outline, 'Status',
                 _status.toUpperCase()),
           ],
         ),
         const SizedBox(height: 16),
 
         if (_items.isNotEmpty)
-          _sectionCard(
+          _section(
             icon: Icons.list_alt_outlined,
-            title: "Items Ordered",
-            color: _ThemeColors.primaryPurple,
+            title: 'Items Ordered',
+            color: _C.purple,
             rows: _items.map<Widget>((item) {
               return _row(
                 Icons.check_circle_outline,
@@ -290,28 +274,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
               );
             }).toList(),
           ),
-        const SizedBox(height: 16),
 
-        if (_isAssigned)
-          _sectionCard(
+        if (_isAssigned) ...[
+          const SizedBox(height: 16),
+          _section(
             icon: Icons.storefront,
-            title: "Your Washmitra",
-            color: _ThemeColors.successGreen,
+            title: 'Your Washmitra',
+            color: _C.green,
             rows: [
-              _row(Icons.person_outline, "Name", _washmitraName),
-              _row(Icons.phone_android, "Mobile",
+              _row(Icons.person_outline, 'Name', _washmitraName),
+              _row(Icons.phone_android, 'Mobile',
                   _washmitramobile),
             ],
           ),
+        ],
 
         const SizedBox(height: 32),
-
         SizedBox(
           width: double.infinity,
           height: 54,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _ThemeColors.primaryPurple,
+              backgroundColor: _C.purple,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -319,7 +303,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             onPressed: () =>
                 UserProfileScreen.switchToServicesTab(context),
-            child: const Text("Back to Services",
+            child: const Text('Back to Services',
                 style: TextStyle(
                     fontSize: 16, fontWeight: FontWeight.bold)),
           ),
@@ -329,83 +313,77 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _glassCard({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: child,
-    );
-  }
+  Widget _glassCard({required Widget child}) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+            horizontal: 20, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.black26,
+          borderRadius: BorderRadius.circular(16),
+          border:
+              Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: child,
+      );
 
-  Widget _sectionCard({
+  Widget _section({
     required IconData icon,
     required String title,
     required Color color,
     required List<Widget> rows,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border:
-            Border.all(color: color.withOpacity(0.2), width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 10),
-            Text(title,
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white.withOpacity(0.95))),
-          ]),
-          Divider(
-              height: 24,
-              color: Colors.white.withOpacity(0.08)),
-          ...rows,
-        ],
-      ),
-    );
-  }
+  }) =>
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border:
+              Border.all(color: color.withOpacity(0.2), width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 10),
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white.withOpacity(0.95))),
+            ]),
+            Divider(height: 24, color: Colors.white.withOpacity(0.08)),
+            ...rows,
+          ],
+        ),
+      );
 
-  Widget _row(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon,
-              size: 16, color: Colors.white.withOpacity(0.4)),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 90,
-            child: Text(label,
-                style: TextStyle(
-                    color: Colors.white.withOpacity(0.45),
-                    fontSize: 13)),
-          ),
-          Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3)),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _row(IconData icon, String label, String value) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon,
+                size: 16, color: Colors.white.withOpacity(0.4)),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 90,
+              child: Text(label,
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.45),
+                      fontSize: 13)),
+            ),
+            Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3)),
+            ),
+          ],
+        ),
+      );
 }
