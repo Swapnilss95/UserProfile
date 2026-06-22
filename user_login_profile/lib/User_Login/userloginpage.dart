@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:user_login_profile/User_Login/forgetpassword.dart';
 import 'package:user_login_profile/User_Login/user_signup_page.dart';
 import 'package:user_login_profile/userprofil.dart';
-// Make sure to import your shared theme file here:
-// import 'package:user_login_profile/cosmic_theme.dart';
 
 // ── Shared Cosmic Theme Definitions ──────────────────────────────────
 const Color bgDeep = Color(0xFF0D0D1A);       // Near-black cosmic indigo
@@ -20,7 +18,6 @@ const Color accentGlow = Color(0xFF7C3AED);   // Deep violet base glow
 
 const Color textPrimary = Color(0xFFE8F0FE);   // Crisp starlight white
 const Color textSecondary = Color(0xFF8A8AB0); // Cool slate mute
-const Color textMuted = Color(0xFF5D5A85);     // Deep structural placeholder
 
 const BoxDecoration cosmicBackgroundDecoration = BoxDecoration(
   gradient: LinearGradient(
@@ -135,6 +132,7 @@ class _UserLoginState extends State<UserLogin> {
       final user = result.user;
 
       if (user != null) {
+        // 1. Adds timeline event metadata to login history logs
         await FirebaseFirestore.instance.collection("login_history").add({
           "uid": user.uid,
           "email": user.email,
@@ -142,6 +140,15 @@ class _UserLoginState extends State<UserLogin> {
           "status": "success",
           "time": FieldValue.serverTimestamp()
         });
+
+        // 2. Stores or updates core user records inside the 'users' collection
+        // SetOptions(merge: true) keeps from wiping out existing custom profile data
+        await FirebaseFirestore.instance.collection("users").doc(user.uid).set({
+          "uid": user.uid,
+          "email": user.email,
+          "lastLogin": FieldValue.serverTimestamp(),
+          "updatedAt": FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
 
       if (!mounted) return;
@@ -244,7 +251,6 @@ class _UserLoginState extends State<UserLogin> {
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
               child: Column(
                 children: [
-                  // Glowing avatar ring matching Sign Up Header
                   Container(
                     width: 96,
                     height: 96,
@@ -303,7 +309,6 @@ class _UserLoginState extends State<UserLogin> {
                   ),
                   const SizedBox(height: 36),
 
-                  // Form Card using global structural decoration settings
                   Container(
                     padding: const EdgeInsets.fromLTRB(22, 28, 22, 28),
                     decoration: buildCosmicCardDecoration(),
@@ -311,7 +316,7 @@ class _UserLoginState extends State<UserLogin> {
                       children: [
                         TextField(
                           controller: email,
-                          style: const TextStyle(color: Colors.white, fontSize: 14.5),
+                          style: const TextStyle(color: Color.fromARGB(255, 200, 141, 141), fontSize: 14.5),
                           cursorColor: accentA,
                           decoration: buildCosmicInputDecoration(
                             labelText: "Email",
@@ -364,7 +369,6 @@ class _UserLoginState extends State<UserLogin> {
                         ),
                         const SizedBox(height: 10),
                         
-                        // Submit button using structural gradient and glow setup
                         SizedBox(
                           width: double.infinity,
                           height: 54,

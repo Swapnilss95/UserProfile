@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:user_login_profile/User_Login/userloginpage.dart';
 import 'package:user_login_profile/userprofil.dart';
 // Note: Keeping your existing imports as reference
 // import 'package:user_login_profile/User_Services/add_to_cart.dart';
@@ -43,7 +42,7 @@ class AllServicesView extends StatelessWidget {
   BoxDecoration buildCosmicCardDecoration() => BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         color: bgCard.withOpacity(0.85),
-        border: Border.all(color: accentGlow.cd(0.22), width: 1.4),
+        border: Border.all(color: accentGlow.withOpacity(0.22), width: 1.4),
         boxShadow: [
           BoxShadow(
             color: accentGlow.withOpacity(0.12),

@@ -81,6 +81,7 @@ class _SignUpScreenState extends State<SignUpScreen>
     setState(() => _isLoading = true);
 
     try {
+      // 1. Creates authentication credentials inside Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
         email: emailText,
@@ -92,6 +93,7 @@ class _SignUpScreenState extends State<SignUpScreen>
       if (user != null) {
         await user.updateDisplayName(nameText);
 
+        // 2. Safely maps and stores structural data profile records within Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -145,14 +147,13 @@ class _SignUpScreenState extends State<SignUpScreen>
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          // Deep cosmic gradient — signature palette
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF0D0D1A), // near-black indigo
-              Color(0xFF12102B), // deep navy
-              Color(0xFF1A0A2E), // dark violet
+              Color(0xFF0D0D1A),
+              Color(0xFF12102B),
+              Color(0xFF1A0A2E),
             ],
             stops: [0.0, 0.5, 1.0],
           ),
@@ -168,18 +169,10 @@ class _SignUpScreenState extends State<SignUpScreen>
                 child: Column(
                   children: [
                     const SizedBox(height: 16),
-
-                    // ── Header ──────────────────────────────────────
                     _buildHeader(),
-
                     const SizedBox(height: 36),
-
-                    // ── Form Card ───────────────────────────────────
                     _buildFormCard(),
-
                     const SizedBox(height: 28),
-
-                    // ── Footer ──────────────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -215,7 +208,6 @@ class _SignUpScreenState extends State<SignUpScreen>
   Widget _buildHeader() {
     return Column(
       children: [
-        // Glowing avatar ring — the signature element
         Container(
           width: 96,
           height: 96,
@@ -286,7 +278,6 @@ class _SignUpScreenState extends State<SignUpScreen>
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        // Frosted glass card
         color: const Color(0xFF1C1A3A).withOpacity(0.85),
         border: Border.all(
           color: const Color(0xFF7C3AED).withOpacity(0.22),

@@ -8,7 +8,7 @@ import 'package:user_login_profile/User_Services/add_to_cart.dart';
 import 'package:user_login_profile/User_Services/box_details.dart';
 import 'package:user_login_profile/User_Services/order_ststus.dart';
 
-// ── Cosmic Theme (copied from login page) ────────────────────────────
+// ── Cosmic Theme ────────────────────────────────────────────────────
 const Color bgDeep    = Color(0xFF0D0D1A);
 const Color bgCard    = Color(0xFF1C1A3A);
 const Color bgSurface = Color(0xFF0F0D24);
@@ -137,11 +137,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (mounted) setState(() => _currentIndex = i);
   }
 
+  // ── FIX: Ensures user document exists in Firestore on every login ──
+  Future<void> _ensureUserDocument() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final ref  = _firestore.collection('users').doc(user.uid);
+    final snap = await ref.get();
+
+    if (!snap.exists) {
+      // First time: create the document with all base fields
+      await ref.set({
+        'name':      user.displayName ?? '',
+        'email':     user.email ?? '',
+        'mobile':    '',
+        'location':  '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Always keep email field in sync
+      await ref.set({'email': user.email ?? ''}, SetOptions(merge: true));
+    }
+  }
+
   void _initSession() {
     _currentUser = _auth.currentUser;
     if (_currentUser != null) {
       _userStream =
           _firestore.collection('users').doc(_currentUser!.uid).snapshots();
+      _ensureUserDocument(); // ← FIX: write user data on init
     }
     _authSub = _auth.userChanges().listen((u) {
       if (mounted) {
@@ -151,6 +175,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ? _firestore.collection('users').doc(u.uid).snapshots()
               : null;
         });
+        if (u != null) _ensureUserDocument(); // ← FIX: write on auth change
       }
     });
   }
@@ -299,7 +324,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   'name':     nameCtrl.text.trim(),
                                   'mobile':   mobileCtrl.text.trim(),
                                   'location': locationCtrl.text.trim(),
-                                  'email':    _currentUser!.email,
+                                  'email':    _currentUser?.email ?? '', // ← FIX: null-safe
                                 }, SetOptions(merge: true));
                                 await _currentUser!.reload();
                                 if (!mounted) return;
@@ -381,9 +406,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               end: Alignment.bottomRight,
             ),
             border: Border(
-              bottom: BorderSide(
-                  color: Color(0xFF7C3AED), // accentGlow
-                  width: 0.5),
+              bottom: BorderSide(color: Color(0xFF7C3AED), width: 0.5),
             ),
           ),
           child: AppBar(
@@ -437,8 +460,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   builder: (context, snap) {
                     String mobile   = 'Not provided';
                     String location = 'Not provided';
-                    String name     =
-                        _currentUser?.displayName ?? 'User';
+                    String name     = _currentUser?.displayName ?? 'User';
                     Map<String, dynamic> raw = {};
 
                     if (snap.hasData && snap.data!.exists) {
@@ -515,7 +537,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         decoration: BoxDecoration(
           color: bgCard,
           border: Border(
-              top: BorderSide(color: accentGlow.withOpacity(0.22), width: 0.8)),
+              top: BorderSide(
+                  color: accentGlow.withOpacity(0.22), width: 0.8)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex.clamp(0, titles.length - 1),
@@ -565,7 +588,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar ring (matches login page style)
             Container(
               width: 66,
               height: 66,
@@ -716,7 +738,8 @@ class AllServicesView extends StatelessWidget {
         content: Text(text, style: const TextStyle(color: textPrimary)),
         behavior: SnackBarBehavior.floating,
         backgroundColor: bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -780,7 +803,6 @@ class AllServicesView extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Category label with cosmic gradient accent
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                   child: Row(
@@ -869,7 +891,6 @@ class AllServicesView extends StatelessWidget {
                               padding: const EdgeInsets.all(12),
                               child: Row(
                                 children: [
-                                  // Service image
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
                                     child: imageUrl.isNotEmpty
