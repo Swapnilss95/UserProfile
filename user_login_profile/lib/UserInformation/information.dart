@@ -60,7 +60,6 @@ class _InformationScreenState extends State<InformationScreen> {
   // ── Checks Firestore for any prior submissions ─────────────────────────────
   Future<void> _checkForExistingProfile() async {
     try {
-      // Fetches the most recent request submitted to prefill details
       final querySnapshot = await _firestore
           .collection('requests')
           .orderBy('createdAt', descending: true)
@@ -77,8 +76,8 @@ class _InformationScreenState extends State<InformationScreen> {
           
           if (lastRequest['latitude'] != null && lastRequest['longitude'] != null) {
             _currentPosition = Position(
-              latitude: lastRequest['latitude'],
-              longitude: lastRequest['longitude'],
+              latitude: (lastRequest['latitude'] as num).toDouble(),
+              longitude: (lastRequest['longitude'] as num).toDouble(),
               timestamp: DateTime.now(),
               accuracy: 0,
               altitude: 0,
@@ -103,9 +102,9 @@ class _InformationScreenState extends State<InformationScreen> {
 
   // ── Opens map picker bottom sheet ──────────────────────────────────────────
   Future<void> _openMapPicker() async {
-    // Block opening if profile already locked and not in edit mode
     if (_hasExistingProfile && !_isEditing) return; 
 
+    // Pass the current pinned location to the sheet so it initializes where the user left off
     final LatLng? picked = await showModalBottomSheet<LatLng>(
       context: context,
       isScrollControlled: true,
@@ -113,7 +112,11 @@ class _InformationScreenState extends State<InformationScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => const _MapPickerSheet(),
+      builder: (ctx) => _MapPickerSheet(
+        initialLocation: _currentPosition != null 
+            ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+            : const LatLng(20.5937, 78.9629),
+      ),
     );
 
     if (picked != null && mounted) {
@@ -129,8 +132,8 @@ class _InformationScreenState extends State<InformationScreen> {
           headingAccuracy: 0,
           speed: 0,
           speedAccuracy: 0,
-        );
-      });
+            );
+          });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Location pinned successfully!"),
@@ -212,6 +215,7 @@ class _InformationScreenState extends State<InformationScreen> {
           "${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}";
       final String formattedTime = _selectedTime!.format(context);
 
+      // CRITICAL FIX: The current map position values are explicitly parsed into payload data coordinates
       Map<String, dynamic> requestPayload = {
         'requestId': generatedId,
         'userName': _nameController.text.trim(),
@@ -254,10 +258,8 @@ class _InformationScreenState extends State<InformationScreen> {
     }
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Fields are enabled if there is no profile, OR if the user is explicitly editing
     bool isFieldEditable = !_hasExistingProfile || _isEditing;
 
     return Scaffold(
@@ -348,7 +350,6 @@ class _InformationScreenState extends State<InformationScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Live location card → disabled if user is not in editing mode
                       IgnorePointer(
                         ignoring: !isFieldEditable,
                         child: _buildLocationCard(isFieldEditable),
@@ -418,7 +419,6 @@ class _InformationScreenState extends State<InformationScreen> {
     );
   }
 
-  // ── Location Card Widget ───────────────────────────────────────────────────
   Widget _buildLocationCard(bool editable) {
     bool hasLocation = _currentPosition != null;
     return InkWell(
@@ -589,16 +589,23 @@ class _InformationScreenState extends State<InformationScreen> {
 
 // ─── Map Picker Bottom Sheet ──────────────────────────────────────────────────
 class _MapPickerSheet extends StatefulWidget {
-  const _MapPickerSheet();
+  final LatLng initialLocation;
+  const _MapPickerSheet({required this.initialLocation});
 
   @override
   State<_MapPickerSheet> createState() => _MapPickerSheetState();
 }
 
 class _MapPickerSheetState extends State<_MapPickerSheet> {
-  LatLng _center = const LatLng(20.5937, 78.9629);
+  late LatLng _center;
   bool _isFetchingGPS = false;
   final MapController _mapController = MapController();
+
+  @override
+  void initState() {
+    super.initState();
+    _center = widget.initialLocation;
+  }
 
   Future<void> _autoDetect() async {
     setState(() => _isFetchingGPS = true);
@@ -723,7 +730,7 @@ class _MapPickerSheetState extends State<_MapPickerSheet> {
                   mapController: _mapController,
                   options: MapOptions(
                     initialCenter: _center,
-                    initialZoom: 13,
+                    initialZoom: 14,
                     onPositionChanged: (position, hasGesture) {
                       if (hasGesture && position.center != null) {
                         setState(() => _center = position.center!);
