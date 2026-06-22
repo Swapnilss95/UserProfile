@@ -5,7 +5,6 @@ import 'package:user_login_profile/userprofil.dart'; // Import for UserProfileSc
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const Color _bgDeep = Color(0xFF080C14);
 const Color _bgCard = Color(0xFF0F1624);
-const Color _bgSurface = Color(0xFF141E2E);
 const Color _accentA = Color(0xFF00D4AA); // bright teal
 const Color _accentB = Color(0xFF00A86B); // emerald
 const Color _textPrimary = Color(0xFFE8F0FE);
@@ -13,14 +12,14 @@ const Color _textSecondary = Color(0xFF8899B0);
 const Color _textMuted = Color(0xFF4A5A72);
 // ─────────────────────────────────────────────────────────────────────────────
 
-class RequestServiceScreen extends StatefulWidget {
-  const RequestServiceScreen({super.key, required String jobDocId});
+class InformationScreen extends StatefulWidget {
+  const InformationScreen({super.key, required String jobDocId});
 
   @override
-  State<RequestServiceScreen> createState() => _RequestServiceScreenState();
+  State<InformationScreen> createState() => _InformationScreenState();
 }
 
-class _RequestServiceScreenState extends State<RequestServiceScreen> {
+class _InformationScreenState extends State<InformationScreen> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -111,39 +110,33 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      // 1. Generate an explicit document reference ID
       DocumentReference newRequestRef = _firestore.collection('requests').doc();
       String generatedId = newRequestRef.id;
 
-      // Formatting text dates cleanly for database read synchronization
       final String formattedDate = "${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}";
       final String formattedTime = _selectedTime!.format(context);
 
-      // 2. Map data package parameters containing all target details
       Map<String, dynamic> requestPayload = {
         'requestId': generatedId,
         'userName': _nameController.text.trim(),
         'userPhone': _phoneController.text.trim(),
         'serviceAddress': _addressController.text.trim(),
-        'scheduledDate': formattedDate, // Stores your chosen Date
-        'scheduledTime': formattedTime, // Stores your chosen Time
-        'status': 'pending',            // Default status line
+        'scheduledDate': formattedDate, 
+        'scheduledTime': formattedTime, 
+        'status': 'pending',            
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // 3. Commit complete payload to the Database
       await newRequestRef.set(requestPayload);
 
       if (mounted) {
-        // Show a brief success alert banner to the user
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Request submitted successfully!"),
+            content: Text("Information submitted successfully!"),
             backgroundColor: _accentB,
           ),
         );
 
-        // 4. Reset navigation stack cleanly back to UserProfileScreen
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const UserProfileScreen()),
@@ -154,7 +147,7 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to process request order: ${e.toString()}"),
+            content: Text("Failed to process information details: ${e.toString()}"),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -170,7 +163,7 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
       backgroundColor: _bgDeep,
       appBar: AppBar(
         title: const Text(
-          "Book Service", 
+          "Information Details", 
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _textPrimary),
         ),
         backgroundColor: _bgCard,
@@ -283,7 +276,7 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
                             child: CircularProgressIndicator(color: _bgDeep, strokeWidth: 2.5),
                           )
                         : const Text(
-                            "Submit Request to Wahmitra", 
+                            "Submit Details", 
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                   ),
@@ -296,7 +289,6 @@ class _RequestServiceScreenState extends State<RequestServiceScreen> {
     );
   }
 
-  // Custom UI elements styles helpers
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
